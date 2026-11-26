@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TaoMate-R1 Live</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #667085; --line: #e2e6ec;
+    --accent: #2f6fed; --accent-text: #ffffff; --ok: #15803d; --warn: #b45309; --bad: #b91c1c;
+    --log-bg: #0f172a; --log-text: #dbeafe;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1218; --panel: #171b23; --text: #e6e9ef; --muted: #98a2b3; --line: #2a303b;
+      --accent: #5b8cff; --accent-text: #0b0f17; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1218; --panel: #171b23; --text: #e6e9ef; --muted: #98a2b3; --line: #2a303b;
+    --accent: #5b8cff; --accent-text: #0b0f17; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif; }
+  header { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; }
+  header .conn { display: flex; gap: 8px; flex: 1; min-width: 260px; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; padding: 16px; max-width: 1400px; margin: 0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  section + section { margin-top: 16px; }
+  h2 { font-size: 13px; margin: 0 0 10px; color: var(--muted); font-weight: 600; letter-spacing: .02em; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+  input[type=text], input[type=number], textarea, select {
+    width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 7px;
+    background: var(--bg); color: var(--text); font: inherit; }
+  textarea { min-height: 84px; resize: vertical; }
+  .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  button { padding: 8px 14px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg);
+           color: var(--text); font: inherit; cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  video { width: 100%; max-height: 72vh; background: #000; border-radius: 8px; display: block; }
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+  @media (max-width: 600px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .stat { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .stat b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 12px; color: var(--muted); }
+  .refs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .ref { position: relative; width: 72px; height: 72px; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+  .ref img { width: 100%; height: 100%; object-fit: cover; }
+  .ref em { position: absolute; left: 0; bottom: 0; right: 0; background: rgba(0,0,0,.6); color: #fff;
+            font-size: 10px; font-style: normal; text-align: center; }
+  .ref button { position: absolute; top: 0; right: 0; padding: 0 5px; font-size: 11px; border-radius: 0 0 0 6px; }
+  #status { font-weight: 600; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  pre#log { height: 200px; overflow: auto; margin: 12px 0 0; padding: 10px; border-radius: 8px;
+            background: var(--log-bg); color: var(--log-text); font-size: 12px; white-space: pre-wrap; }
+  details { margin-top: 10px; font-size: 12px; color: var(--muted); }
+  code { font-size: 12px; }
+  .check { display: flex; gap: 6px; align-items: center; margin-top: 8px; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>TaoMate-R1 Live</h1>
+  <div class="conn">
+    <input id="url" type="text" value="ws://localhost:8000/v1/realtime/video" aria-label="服务地址">
+  </div>
+  <span id="status">未连接</span>
+</header>
+
+<main>
+  <div>
+    <section>
+      <video id="player" autoplay muted controls playsinline></video>
+      <div class="stats">
+        <div class="stat"><b id="sFirst">–</b><span>首块延迟 (s)</span></div>
+        <div class="stat"><b id="sChunk">–</b><span>平均每块 (s)，实时 ≤ 1.42</span></div>
+        <div class="stat"><b id="sCount">0</b><span>已收 chunk</span></div>
+        <div class="stat"><b id="sAhead">–</b><span>缓冲领先 (s)</span></div>
+      </div>
+      <pre id="log">准备就绪。</pre>
+    </section>
+  </div>
+
+  <div>
+    <section>
+      <h2>开播</h2>
+      <label for="prompt">Prompt（用 &lt;Picture 1&gt;、&lt;Picture 2&gt; 指代参考图）</label>
+      <textarea id="prompt">&lt;Picture 1&gt; 中的主播坐在直播间里，手里拿着 &lt;Picture 2&gt; 中的商品，面向镜头用普通话介绍它的外观和用法。</textarea>
+      <label>参考图（按顺序：主播/场景、商品…）</label>
+      <input id="refFiles" type="file" accept="image/*" multiple>
+      <div id="refs" class="refs"></div>
+      <div class="row">
+        <div><label for="res">分辨率</label>
+          <select id="res">
+            <option value="768x1344" selected>768×1344 竖屏</option>
+            <option value="480x864">480×864 竖屏</option>
+            <option value="1344x768">1344×768 横屏</option>
+          </select></div>
+        <div><label for="dur">时长 (s)</label><input id="dur" type="number" value="30" min="5" step="5"></div>
+        <div><label for="seed">Seed</label><input id="seed" type="number" value="9111"></div>
+      </div>
+      <div class="actions">
+        <button id="start" class="primary">开始</button>
+        <button id="stop" disabled>停止</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>换商品（下一个 chunk 边界生效）</h2>
+      <label for="newPrompt">新 Prompt</label>
+      <textarea id="newPrompt">&lt;Picture 1&gt; 中的主播放下手里的东西，拿起 &lt;Picture 2&gt; 中的新商品，继续介绍。</textarea>
+      <label>新商品图（替换第 2 张及之后的参考图）</label>
+      <input id="newFiles" type="file" accept="image/*" multiple>
+      <div id="newRefs" class="refs"></div>
+      <label class="check"><input id="refreshSink" type="checkbox"> 刷新 sink（丢掉开场 chunk 的历史）</label>
+      <label class="check"><input id="keepOld" type="checkbox"> 过渡：本次同时保留旧商品图</label>
+      <div class="actions">
+        <button id="switch" disabled>发送换商品</button>
+      </div>
+      <details>
+        <summary>怎么连上服务</summary>
+        <p>本页通过 https 打开，浏览器只允许它连 <code>ws://localhost</code>。在 Mac 上先转发端口：</p>
+        <p><code>ssh -N -L 8000:&lt;计算节点&gt;:8000 &lt;用户名&gt;@&lt;登录节点&gt;</code></p>
+        <p>然后保持上面的地址为 <code>ws://localhost:8000/v1/realtime/video</code>。</p>
+      </details>
+    </section>
+  </div>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const CHUNK_SECONDS = 34 / 24;
+  let ws = null, mediaSource = null, sourceBuffer = null, queue = [], done = false;
+  let startRefs = [], newRefs = [];
+  let tStart = 0, tFirst = 0, tLast = 0, chunkCount = 0, intervals = [];
+
+  function log(line) {
+    const node = $("log");
+    node.textContent += "\n" + new Date().toLocaleTimeString() + "  " + line;
+    node.scrollTop = node.scrollHeight;
+  }
+  function status(text, cls) { const n = $("status"); n.textContent = text; n.className = cls || ""; }
+
+  function readFiles(files) {
+    return Promise.all([...files].map((file) => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ kind: "image", name: file.name, url: reader.result,
+                                      data: String(reader.result).split(",")[1] });
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    })));
+  }
+  function renderRefs(container, list, offset) {
+    container.innerHTML = "";
+    list.forEach((ref, i) => {
+      const box = document.createElement("div");
+      box.className = "ref";
+      box.innerHTML = `<img alt=""><em>Picture ${i + offset}</em><button title="移除">×</button>`;
+      box.querySelector("img").src = ref.url;
+      box.querySelector("button").onclick = () => { list.splice(i, 1); renderRefs(container, list, offset); };
+      container.appendChild(box);
+    });
+  }
+  const strip = (refs) => refs.map(({ kind, name, data }) => ({ kind, name, data }));
+
+  $("refFiles").onchange = async (e) => { startRefs.push(...await readFiles(e.target.files)); renderRefs($("refs"), startRefs, 1); e.target.value = ""; };
+  $("newFiles").onchange = async (e) => { newRefs.push(...await readFiles(e.target.files)); renderRefs($("newRefs"), newRefs, 2); e.target.value = ""; };
+
+  function chooseMime() {
+    for (const mime of ['video/mp4; codecs="avc1.64001F, mp4a.40.2"', 'video/mp4; codecs="avc1.4D401F, mp4a.40.2"',
+                        'video/mp4; codecs="avc1.42E01E, mp4a.40.2"', 'video/mp4; codecs="avc1.64001F"', "video/mp4"]) {
+      if (window.MediaSource && MediaSource.isTypeSupported(mime)) return mime;
+    }
+    return null;
+  }
+  function pump() {
+    if (!sourceBuffer || sourceBuffer.updating || queue.length === 0) return;
+    try { sourceBuffer.appendBuffer(queue.shift()); }
+    catch (err) { log("SourceBuffer append 失败: " + err.message); }
+  }
+  function finish() {
+    if (mediaSource && mediaSource.readyState === "open" && sourceBuffer && !sourceBuffer.updating && queue.length === 0) {
+      try { mediaSource.endOfStream(); } catch (_) {}
+    }
+    $("start").disabled = false; $("stop").disabled = true; $("switch").disabled = true;
+  }
+  function updateStats() {
+    $("sCount").textContent = chunkCount;
+    $("sFirst").textContent = tFirst ? ((tFirst - tStart) / 1000).toFixed(2) : "–";
+    if (intervals.length) {
+      const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length / 1000;
+      const node = $("sChunk");
+      node.textContent = avg.toFixed(2);
+      node.className = avg <= CHUNK_SECONDS ? "ok" : "bad";
+    }
+    const v = $("player");
+    if (v.buffered.length) $("sAhead").textContent = (v.buffered.end(v.buffered.length - 1) - v.currentTime).toFixed(1);
+  }
+  setInterval(updateStats, 500);
+
+  $("start").onclick = () => {
+    if (startRefs.length === 0) { log("请先选择参考图（主播/场景 + 商品）"); return; }
+    const mime = chooseMime();
+    if (!mime) { log("浏览器不支持 MSE fMP4 播放"); return; }
+    const [width, height] = $("res").value.split("x").map(Number);
+    const payload = {
+      type: "session.start", model: "taomate-r1", format: "m4s",
+      prompt: $("prompt").value, references: strip(startRefs),
+      width, height, fps: 24, duration: Number($("dur").value), seed: Number($("seed").value),
+    };
+    queue = []; done = false; chunkCount = 0; intervals = []; tFirst = 0;
+    mediaSource = new MediaSource();
+    $("player").src = URL.createObjectURL(mediaSource);
+    mediaSource.addEventListener("sourceopen", () => {
+      sourceBuffer = mediaSource.addSourceBuffer(mime);
+      sourceBuffer.mode = "sequence";
+      sourceBuffer.addEventListener("updateend", () => { pump(); if (done) finish(); });
+      ws = new WebSocket($("url").value);
+      ws.binaryType = "arraybuffer";
+      ws.onopen = () => {
+        tStart = performance.now(); tLast = 0;
+        ws.send(JSON.stringify(payload));
+        status("生成中", "warn"); log("已连接，发送 session.start");
+        $("start").disabled = true; $("stop").disabled = false; $("switch").disabled = false;
+      };
+      ws.onmessage = (event) => {
+        if (typeof event.data !== "string") {
+          const now = performance.now();
+          if (!tFirst) tFirst = now; else intervals.push(now - tLast);
+          tLast = now; chunkCount += 1;
+          queue.push(event.data); pump();
+          return;
+        }
+        const msg = JSON.parse(event.data);
+        if (msg.type === "video.chunk_metadata") log("chunk " + JSON.stringify(msg));
+        else if (msg.type === "session.done") { done = true; status("完成", "ok"); log("完成 " + JSON.stringify(msg)); finish(); }
+        else if (msg.type === "error") { done = true; status("出错", "bad"); log("错误: " + (msg.message || JSON.stringify(msg))); finish(); }
+        else log(msg.type + " " + JSON.stringify(msg));
+      };
+      ws.onerror = () => { status("连接失败", "bad"); log("WebSocket 错误：检查 ssh -L 端口转发和服务地址"); };
+      ws.onclose = () => { if (!done) { done = true; status("已断开", "bad"); log("连接在结束前断开"); finish(); } };
+    }, { once: true });
+  };
+
+  $("stop").onclick = () => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "session.stop" })); };
+
+  $("switch").onclick = () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (newRefs.length === 0) { log("请先选择新商品图"); return; }
+    const keepOld = $("keepOld").checked;
+    const references = keepOld ? [...strip(startRefs), ...strip(newRefs)] : [strip(startRefs)[0], ...strip(newRefs)];
+    const eventId = "switch-" + Date.now();
+    ws.send(JSON.stringify({
+      type: "session.interaction",
+      interaction: { event_id: eventId, event: { prompt: $("newPrompt").value, references },
+                     refresh_sink: $("refreshSink").checked },
+    }));
+    log(`发送换商品 ${eventId}（参考图 ${references.length} 张，refresh_sink=${$("refreshSink").checked}, 过渡=${keepOld}）`);
+  };
+})();
+</script>
+</body>
+</html>
